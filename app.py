@@ -288,6 +288,26 @@ if "current_step" not in st.session_state:
 if "plan" not in st.session_state:
     st.session_state.plan = None
 
+# Guard against a stale/partial session (e.g. app redeploy, reconnect, or a
+# direct reload) where current_step points ahead of data that was never
+# actually entered in this session. Snap back to the first step whose
+# required inputs are missing instead of crashing on a KeyError/AttributeError.
+_REQUIRED_KEYS_BEFORE_STEP = {
+    2: ["age", "monthly_income", "monthly_expenses", "monthly_emi"],
+    3: ["current_savings", "existing_investments"],
+    4: ["risk_tolerance", "investment_experience"],
+    5: ["selected_goal_types"],
+    6: ["plan"],
+}
+for _step in range(2, st.session_state.current_step + 1):
+    _missing = [
+        k for k in _REQUIRED_KEYS_BEFORE_STEP.get(_step, [])
+        if k not in st.session_state or st.session_state.get(k) is None
+    ]
+    if _missing:
+        st.session_state.current_step = _step - 1
+        break
+
 
 def go_to(step: int):
     st.session_state.current_step = step
@@ -575,22 +595,22 @@ elif st.session_state.current_step == 5:
     with rc1:
         st.markdown("**Personal & Cash Flow**")
         st.markdown('<div class="review-block">', unsafe_allow_html=True)
-        review_row("Age", st.session_state.age)
-        review_row("Monthly Income", f"₹{st.session_state.monthly_income:,.0f}")
-        review_row("Monthly Expenses", f"₹{st.session_state.monthly_expenses:,.0f}")
-        review_row("Monthly EMI", f"₹{st.session_state.monthly_emi:,.0f}")
+        review_row("Age", st.session_state.get("age", 28))
+        review_row("Monthly Income", f"₹{st.session_state.get('monthly_income', 0):,.0f}")
+        review_row("Monthly Expenses", f"₹{st.session_state.get('monthly_expenses', 0):,.0f}")
+        review_row("Monthly EMI", f"₹{st.session_state.get('monthly_emi', 0):,.0f}")
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("**Assets**")
         st.markdown('<div class="review-block">', unsafe_allow_html=True)
-        review_row("Current Savings", f"₹{st.session_state.current_savings:,.0f}")
-        review_row("Existing Investments", f"₹{st.session_state.existing_investments:,.0f}")
+        review_row("Current Savings", f"₹{st.session_state.get('current_savings', 0):,.0f}")
+        review_row("Existing Investments", f"₹{st.session_state.get('existing_investments', 0):,.0f}")
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("**Risk Profile**")
         st.markdown('<div class="review-block">', unsafe_allow_html=True)
-        review_row("Risk Tolerance", st.session_state.risk_tolerance.title())
-        review_row("Investment Experience", st.session_state.investment_experience.title())
+        review_row("Risk Tolerance", st.session_state.get("risk_tolerance", "moderate").title())
+        review_row("Investment Experience", st.session_state.get("investment_experience", "beginner").title())
         st.markdown('</div>', unsafe_allow_html=True)
 
     with rc2:
@@ -626,14 +646,14 @@ elif st.session_state.current_step == 5:
         if st.button("Generate Financial Plan", type="primary", key="generate_plan", disabled=bool(goal_errors)):
             try:
                 st.session_state.plan = generate_financial_plan(
-                    age=st.session_state.age,
-                    monthly_income=st.session_state.monthly_income,
-                    monthly_expenses=st.session_state.monthly_expenses,
-                    monthly_emi=st.session_state.monthly_emi,
-                    current_savings=st.session_state.current_savings,
-                    existing_investments=st.session_state.existing_investments,
-                    risk_tolerance=st.session_state.risk_tolerance,
-                    investment_experience=st.session_state.investment_experience,
+                    age=st.session_state.get("age", 28),
+                    monthly_income=st.session_state.get("monthly_income", 0),
+                    monthly_expenses=st.session_state.get("monthly_expenses", 0),
+                    monthly_emi=st.session_state.get("monthly_emi", 0),
+                    current_savings=st.session_state.get("current_savings", 0),
+                    existing_investments=st.session_state.get("existing_investments", 0),
+                    risk_tolerance=st.session_state.get("risk_tolerance", "moderate"),
+                    investment_experience=st.session_state.get("investment_experience", "beginner"),
                     goals=goals,
                 )
                 go_to(6)
