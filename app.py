@@ -36,16 +36,8 @@ st.markdown(
     .stApp {{ background-color: #F8FAFC; }}
     #MainMenu, footer {{ visibility: hidden; }}
 
-    .app-header {{
-        display:flex; align-items:center; justify-content:space-between;
-        margin-bottom: 4px;
-    }}
-    .app-title {{
-        font-size: 30px; font-weight: 700; color:{NAVY}; margin:0;
-    }}
-    .app-subtitle {{
-        font-size: 14px; color:{NAVY_SOFT}; margin-top:2px;
-    }}
+    .app-title {{ font-size: 30px; font-weight: 700; color:{NAVY}; margin:0; }}
+    .app-subtitle {{ font-size: 14px; color:{NAVY_SOFT}; margin-top:2px; }}
     .badge-proto {{
         display:inline-block; padding:4px 12px; border-radius:999px;
         background:{GREY_BG}; color:{NAVY_SOFT}; font-size:12px; font-weight:600;
@@ -58,7 +50,7 @@ st.markdown(
 
     .section-title {{
         font-size:18px; font-weight:700; color:{NAVY};
-        margin-top:28px; margin-bottom:10px;
+        margin-top:20px; margin-bottom:10px;
         border-bottom: 1px solid {BORDER}; padding-bottom:6px;
     }}
 
@@ -107,9 +99,7 @@ st.markdown(
         background:white; border:1px solid {BORDER}; border-radius:10px;
         padding:12px 16px; margin-bottom:8px;
     }}
-    .action-num {{
-        font-size:16px; font-weight:700; color:{NAVY_SOFT}; min-width:26px;
-    }}
+    .action-num {{ font-size:16px; font-weight:700; color:{NAVY_SOFT}; min-width:26px; }}
     .action-text {{ font-size:14px; font-weight:600; color:{NAVY}; flex:1; }}
 
     .priority-row {{
@@ -124,6 +114,34 @@ st.markdown(
         font-size:11px; color:{GREY}; margin-top:30px; padding-top:12px;
         border-top:1px solid {BORDER};
     }}
+
+    .step-progress-label {{
+        font-size:12px; font-weight:700; color:{NAVY_SOFT}; margin-top:10px;
+    }}
+    .step-progress {{
+        display:flex; align-items:center; flex-wrap:wrap; gap:6px;
+        margin-top:6px; margin-bottom:22px;
+    }}
+    .step-chip {{
+        padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600;
+        background:{GREY_BG}; color:{GREY}; border:1px solid {BORDER};
+        white-space:nowrap;
+    }}
+    .step-chip.step-active {{ background:{NAVY}; color:white; border-color:{NAVY}; }}
+    .step-chip.step-done {{ background:{GREEN_BG}; color:{GREEN}; border-color:{GREEN_BG}; }}
+    .step-arrow {{ color:{GREY}; font-size:12px; }}
+
+    .review-block {{
+        background:white; border:1px solid {BORDER}; border-radius:12px;
+        padding:16px 18px; margin-bottom:14px;
+    }}
+    .review-row {{
+        display:flex; justify-content:space-between; padding:5px 0;
+        border-bottom:1px solid {GREY_BG}; font-size:13px;
+    }}
+    .review-row:last-child {{ border-bottom:none; }}
+    .review-label {{ color:{GREY}; }}
+    .review-value {{ color:{NAVY}; font-weight:600; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -131,7 +149,25 @@ st.markdown(
 
 
 # ----------------------------------------------------------------------------
-# HELPERS (presentation only — no financial logic)
+# CONSTANTS
+# ----------------------------------------------------------------------------
+GOAL_LIBRARY = {
+    "Retirement":      {"icon": "🏦", "target": 5_000_000, "current": 500_000,   "years": 10, "priority": "High"},
+    "Home":            {"icon": "🏠", "target": 5_000_000, "current": 1_000_000, "years": 7,  "priority": "High"},
+    "Car":             {"icon": "🚗", "target": 1_200_000, "current": 200_000,   "years": 3,  "priority": "Medium"},
+    "Education":       {"icon": "🎓", "target": 2_000_000, "current": 0,         "years": 5,  "priority": "Medium"},
+    "Travel":          {"icon": "✈️", "target": 300_000,   "current": 50_000,    "years": 1,  "priority": "Medium"},
+    "Marriage":        {"icon": "💍", "target": 1_500_000, "current": 200_000,   "years": 4,  "priority": "Medium"},
+    "Emergency Fund":  {"icon": "🛟", "target": 300_000,   "current": 100_000,   "years": 1,  "priority": "High"},
+    "Wealth Creation": {"icon": "📈", "target": 3_000_000, "current": 200_000,   "years": 8,  "priority": "Medium"},
+    "Other":           {"icon": "🎯", "target": 500_000,   "current": 0,         "years": 3,  "priority": "Medium"},
+}
+PRIORITY_OPTIONS = ["High", "Medium", "Low"]
+STEP_NAMES = ["Personal", "Assets", "Risk", "Goals", "Review", "Results"]
+
+
+# ----------------------------------------------------------------------------
+# PRESENTATION HELPERS (no financial logic)
 # ----------------------------------------------------------------------------
 def pill_class(status: str) -> str:
     mapping = {
@@ -236,16 +272,106 @@ def scenario_bar(scenarios, title):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def health_color(score):
-    if score >= 70:
-        return GREEN
-    if score >= 40:
-        return AMBER
-    return RED
+def review_row(label, value):
+    st.markdown(
+        f'<div class="review-row"><span class="review-label">{label}</span>'
+        f'<span class="review-value">{value}</span></div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ----------------------------------------------------------------------------
-# HEADER
+# SESSION STATE / WIZARD NAVIGATION
+# ----------------------------------------------------------------------------
+if "current_step" not in st.session_state:
+    st.session_state.current_step = 1
+if "plan" not in st.session_state:
+    st.session_state.plan = None
+
+
+def go_to(step: int):
+    st.session_state.current_step = step
+    st.rerun()
+
+
+def reset_wizard():
+    for k in list(st.session_state.keys()):
+        del st.session_state[k]
+    st.session_state.current_step = 1
+    st.session_state.plan = None
+    st.rerun()
+
+
+def build_goals():
+    """Reads persisted widget values from session_state and converts them
+    into FinancialGoal objects. Does not touch financial_engine.py."""
+    goals = []
+    errors = []
+    selected = st.session_state.get("selected_goal_types", [])
+
+    if not selected:
+        errors.append("Select at least one goal to continue.")
+
+    for goal_type in selected:
+        defaults = GOAL_LIBRARY[goal_type]
+
+        if goal_type == "Other":
+            display_name = st.session_state.get("goal_other_name", "").strip()
+            header_label = display_name if display_name else "Other (name required)"
+            if not display_name:
+                errors.append("Enter a goal name for 'Other'.")
+        else:
+            display_name = goal_type
+            header_label = goal_type
+
+        target_amount = st.session_state.get(f"goal_target_{goal_type}", defaults["target"])
+        current_amount = st.session_state.get(f"goal_current_{goal_type}", defaults["current"])
+        horizon = st.session_state.get(f"goal_years_{goal_type}", defaults["years"])
+        goal_priority = st.session_state.get(f"goal_priority_{goal_type}", defaults["priority"])
+
+        if target_amount <= 0:
+            errors.append(f"{header_label}: Target amount must be greater than 0.")
+        if current_amount < 0:
+            errors.append(f"{header_label}: Current amount cannot be negative.")
+        if horizon <= 0:
+            errors.append(f"{header_label}: Time horizon must be greater than 0.")
+
+        if display_name:
+            goals.append(
+                FinancialGoal(
+                    name=display_name,
+                    target_amount=target_amount,
+                    current_amount=current_amount,
+                    years=horizon,
+                    priority=goal_priority,
+                )
+            )
+
+    return goals, errors
+
+
+def render_progress():
+    step = st.session_state.current_step
+    st.markdown(
+        f'<div class="step-progress-label">Step {step} of {len(STEP_NAMES)}</div>',
+        unsafe_allow_html=True,
+    )
+    chips = ""
+    for i, name in enumerate(STEP_NAMES, start=1):
+        if i == step:
+            cls = "step-active"
+        elif i < step:
+            cls = "step-done"
+        else:
+            cls = ""
+        chips += f'<span class="step-chip {cls}">{i}. {name}</span>'
+        if i < len(STEP_NAMES):
+            chips += '<span class="step-arrow">→</span>'
+    st.markdown(f'<div class="step-progress">{chips}</div>', unsafe_allow_html=True)
+
+
+# ----------------------------------------------------------------------------
+# HEADER (always visible)
 # ----------------------------------------------------------------------------
 h1, h2 = st.columns([4, 1])
 with h1:
@@ -266,173 +392,264 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ----------------------------------------------------------------------------
-# INPUTS
-# ----------------------------------------------------------------------------
-st.markdown('<div class="section-title">Financial Profile</div>', unsafe_allow_html=True)
+render_progress()
 
-with st.expander("Personal & Cash Flow", expanded=True):
+# ----------------------------------------------------------------------------
+# STEP 1 — PERSONAL & CASH FLOW
+# ----------------------------------------------------------------------------
+if st.session_state.current_step == 1:
+    st.markdown('<div class="section-title">Personal & Cash Flow</div>', unsafe_allow_html=True)
+
     c1, c2 = st.columns(2)
     with c1:
-        age = st.number_input("Age", 18, 100, 28, help="Used to gauge investment horizon and risk capacity")
-        monthly_income = st.number_input(
-            "Monthly Income (₹)", 0, 10_000_000, 100_000, step=5_000
+        st.number_input(
+            "Age", 18, 100, st.session_state.get("age", 28), key="age",
+            help="Used to gauge investment horizon and risk capacity"
+        )
+        st.number_input(
+            "Monthly Income (₹)", 0, 10_000_000,
+            st.session_state.get("monthly_income", 100_000), step=5_000,
+            key="monthly_income"
         )
     with c2:
-        monthly_expenses = st.number_input(
-            "Monthly Expenses (₹)", 0, 10_000_000, 55_000, step=5_000
+        st.number_input(
+            "Monthly Expenses (₹)", 0, 10_000_000,
+            st.session_state.get("monthly_expenses", 55_000), step=5_000,
+            key="monthly_expenses"
         )
-        monthly_emi = st.number_input(
-            "Monthly EMI (₹)", 0, 10_000_000, 10_000, step=1_000,
+        st.number_input(
+            "Monthly EMI (₹)", 0, 10_000_000,
+            st.session_state.get("monthly_emi", 10_000), step=1_000,
+            key="monthly_emi",
             help="Total of all recurring loan/EMI obligations"
         )
 
-with st.expander("Assets", expanded=True):
+    st.write("")
+    if st.button("Next →", type="primary", key="next_1"):
+        go_to(2)
+
+# ----------------------------------------------------------------------------
+# STEP 2 — ASSETS
+# ----------------------------------------------------------------------------
+elif st.session_state.current_step == 2:
+    st.markdown('<div class="section-title">Assets</div>', unsafe_allow_html=True)
+
     a1, a2 = st.columns(2)
     with a1:
-        current_savings = st.number_input(
-            "Current Savings (₹)", 0, 100_000_000, 300_000, step=10_000,
+        st.number_input(
+            "Current Savings (₹)", 0, 100_000_000,
+            st.session_state.get("current_savings", 300_000), step=10_000,
+            key="current_savings",
             help="Liquid savings used for your emergency fund calculation"
         )
     with a2:
-        existing_investments = st.number_input(
-            "Existing Investments (₹)", 0, 100_000_000, 500_000, step=10_000
+        st.number_input(
+            "Existing Investments (₹)", 0, 100_000_000,
+            st.session_state.get("existing_investments", 500_000), step=10_000,
+            key="existing_investments"
         )
 
-with st.expander("Risk Profile", expanded=True):
+    st.write("")
+    b1, b2 = st.columns([1, 1])
+    with b1:
+        if st.button("← Back", key="back_2"):
+            go_to(1)
+    with b2:
+        if st.button("Next →", type="primary", key="next_2"):
+            go_to(3)
+
+# ----------------------------------------------------------------------------
+# STEP 3 — RISK PROFILE
+# ----------------------------------------------------------------------------
+elif st.session_state.current_step == 3:
+    st.markdown('<div class="section-title">Risk Profile</div>', unsafe_allow_html=True)
+
     r1, r2 = st.columns(2)
+    tolerance_options = ["low", "moderate", "high"]
+    experience_options = ["beginner", "some experience", "experienced"]
     with r1:
-        risk_tolerance = st.selectbox(
-            "Risk Tolerance", ["low", "moderate", "high"], index=1,
+        st.selectbox(
+            "Risk Tolerance", tolerance_options,
+            index=tolerance_options.index(st.session_state.get("risk_tolerance", "moderate")),
+            key="risk_tolerance",
             help="Your self-reported comfort with investment risk"
         )
     with r2:
-        investment_experience = st.selectbox(
-            "Investment Experience",
-            ["beginner", "some experience", "experienced"],
-            index=0,
+        st.selectbox(
+            "Investment Experience", experience_options,
+            index=experience_options.index(st.session_state.get("investment_experience", "beginner")),
+            key="investment_experience",
         )
 
+    st.write("")
+    b1, b2 = st.columns([1, 1])
+    with b1:
+        if st.button("← Back", key="back_3"):
+            go_to(2)
+    with b2:
+        if st.button("Next →", type="primary", key="next_3"):
+            go_to(4)
+
 # ----------------------------------------------------------------------------
-# GOALS
+# STEP 4 — FINANCIAL GOALS
 # ----------------------------------------------------------------------------
-GOAL_LIBRARY = {
-    "Retirement":      {"icon": "🏦", "target": 5_000_000, "current": 500_000,   "years": 10, "priority": "High"},
-    "Home":            {"icon": "🏠", "target": 5_000_000, "current": 1_000_000, "years": 7,  "priority": "High"},
-    "Car":             {"icon": "🚗", "target": 1_200_000, "current": 200_000,   "years": 3,  "priority": "Medium"},
-    "Education":       {"icon": "🎓", "target": 2_000_000, "current": 0,         "years": 5,  "priority": "Medium"},
-    "Travel":          {"icon": "✈️", "target": 300_000,   "current": 50_000,    "years": 1,  "priority": "Medium"},
-    "Marriage":        {"icon": "💍", "target": 1_500_000, "current": 200_000,   "years": 4,  "priority": "Medium"},
-    "Emergency Fund":  {"icon": "🛟", "target": 300_000,   "current": 100_000,   "years": 1,  "priority": "High"},
-    "Wealth Creation": {"icon": "📈", "target": 3_000_000, "current": 200_000,   "years": 8,  "priority": "Medium"},
-    "Other":           {"icon": "🎯", "target": 500_000,   "current": 0,         "years": 3,  "priority": "Medium"},
-}
-PRIORITY_OPTIONS = ["High", "Medium", "Low"]
+elif st.session_state.current_step == 4:
+    st.markdown('<div class="section-title">Financial Goals</div>', unsafe_allow_html=True)
+    st.caption("Select one or more goals you want to plan for.")
 
-st.markdown('<div class="section-title">Financial Goals</div>', unsafe_allow_html=True)
-st.caption("Select one or more goals you want to plan for.")
+    st.multiselect(
+        "What are you planning for?",
+        options=list(GOAL_LIBRARY.keys()),
+        default=st.session_state.get("selected_goal_types", ["Retirement", "Car", "Home"]),
+        key="selected_goal_types",
+    )
 
-selected_goal_types = st.multiselect(
-    "What are you planning for?",
-    options=list(GOAL_LIBRARY.keys()),
-    default=["Retirement", "Car", "Home"],
-    key="selected_goal_types",
-)
+    selected_goal_types = st.session_state.get("selected_goal_types", [])
 
-goals = []
-goal_errors = []
+    for goal_type in selected_goal_types:
+        defaults = GOAL_LIBRARY[goal_type]
 
-if not selected_goal_types:
-    goal_errors.append("Select at least one goal to continue.")
-
-for goal_type in selected_goal_types:
-    defaults = GOAL_LIBRARY[goal_type]
-
-    # Resolve the display name — "Other" needs a custom name from the user.
-    if goal_type == "Other":
-        other_name = st.text_input(
-            "Enter your goal name",
-            value="",
-            key="goal_other_name",
-            placeholder="e.g. Startup, Sabbatical, Gadget Fund",
-        )
-        display_name = other_name.strip()
-        header_label = display_name if display_name else "Other (name required)"
-    else:
-        display_name = goal_type
-        header_label = goal_type
-
-    with st.expander(f"{defaults['icon']} {header_label}", expanded=True):
-        g1, g2, g3 = st.columns(3)
-
-        with g1:
-            target_amount = st.number_input(
-                "Target Amount (₹)", min_value=0, value=defaults["target"], step=50_000,
-                key=f"goal_target_{goal_type}"
+        if goal_type == "Other":
+            other_name = st.text_input(
+                "Enter your goal name",
+                value=st.session_state.get("goal_other_name", ""),
+                key="goal_other_name",
+                placeholder="e.g. Startup, Sabbatical, Gadget Fund",
             )
+            header_label = other_name.strip() if other_name.strip() else "Other (name required)"
+        else:
+            header_label = goal_type
 
-        with g2:
-            current_amount = st.number_input(
-                "Current Amount (₹)", min_value=0, value=defaults["current"], step=25_000,
-                key=f"goal_current_{goal_type}"
-            )
-            horizon = st.number_input(
-                "Time Horizon (Years)", min_value=1, max_value=50, value=defaults["years"], step=1,
-                key=f"goal_years_{goal_type}"
-            )
-
-        with g3:
-            goal_priority = st.selectbox(
-                "Priority", PRIORITY_OPTIONS,
-                index=PRIORITY_OPTIONS.index(defaults["priority"]),
-                key=f"goal_priority_{goal_type}"
-            )
-
-        # ---- validation ----
-        if goal_type == "Other" and not display_name:
-            goal_errors.append("Enter a goal name for 'Other'.")
-        if target_amount <= 0:
-            goal_errors.append(f"{header_label}: Target amount must be greater than 0.")
-        if current_amount < 0:
-            goal_errors.append(f"{header_label}: Current amount cannot be negative.")
-        if horizon <= 0:
-            goal_errors.append(f"{header_label}: Time horizon must be greater than 0.")
-
-        if display_name:
-            goals.append(
-                FinancialGoal(
-                    name=display_name,
-                    target_amount=target_amount,
-                    current_amount=current_amount,
-                    years=horizon,
-                    priority=goal_priority,
+        with st.expander(f"{defaults['icon']} {header_label}", expanded=True):
+            g1, g2, g3 = st.columns(3)
+            with g1:
+                st.number_input(
+                    "Target Amount (₹)", min_value=0,
+                    value=st.session_state.get(f"goal_target_{goal_type}", defaults["target"]),
+                    step=50_000, key=f"goal_target_{goal_type}"
                 )
+            with g2:
+                st.number_input(
+                    "Current Amount (₹)", min_value=0,
+                    value=st.session_state.get(f"goal_current_{goal_type}", defaults["current"]),
+                    step=25_000, key=f"goal_current_{goal_type}"
+                )
+                st.number_input(
+                    "Time Horizon (Years)", min_value=1, max_value=50,
+                    value=st.session_state.get(f"goal_years_{goal_type}", defaults["years"]),
+                    step=1, key=f"goal_years_{goal_type}"
+                )
+            with g3:
+                st.selectbox(
+                    "Priority", PRIORITY_OPTIONS,
+                    index=PRIORITY_OPTIONS.index(
+                        st.session_state.get(f"goal_priority_{goal_type}", defaults["priority"])
+                    ),
+                    key=f"goal_priority_{goal_type}"
+                )
+
+    _, goal_errors = build_goals()
+    if goal_errors:
+        for err in goal_errors:
+            st.warning(err)
+
+    st.write("")
+    b1, b2 = st.columns([1, 1])
+    with b1:
+        if st.button("← Back", key="back_4"):
+            go_to(3)
+    with b2:
+        if st.button("Next →", type="primary", key="next_4", disabled=bool(goal_errors)):
+            go_to(5)
+
+# ----------------------------------------------------------------------------
+# STEP 5 — REVIEW & CONFIRM
+# ----------------------------------------------------------------------------
+elif st.session_state.current_step == 5:
+    st.markdown('<div class="section-title">Review & Confirm</div>', unsafe_allow_html=True)
+    st.caption("Please review your details before generating your financial plan.")
+
+    goals, goal_errors = build_goals()
+
+    rc1, rc2 = st.columns(2)
+    with rc1:
+        st.markdown("**Personal & Cash Flow**")
+        st.markdown('<div class="review-block">', unsafe_allow_html=True)
+        review_row("Age", st.session_state.age)
+        review_row("Monthly Income", f"₹{st.session_state.monthly_income:,.0f}")
+        review_row("Monthly Expenses", f"₹{st.session_state.monthly_expenses:,.0f}")
+        review_row("Monthly EMI", f"₹{st.session_state.monthly_emi:,.0f}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("**Assets**")
+        st.markdown('<div class="review-block">', unsafe_allow_html=True)
+        review_row("Current Savings", f"₹{st.session_state.current_savings:,.0f}")
+        review_row("Existing Investments", f"₹{st.session_state.existing_investments:,.0f}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("**Risk Profile**")
+        st.markdown('<div class="review-block">', unsafe_allow_html=True)
+        review_row("Risk Tolerance", st.session_state.risk_tolerance.title())
+        review_row("Investment Experience", st.session_state.investment_experience.title())
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with rc2:
+        st.markdown("**Goals**")
+        if not goals:
+            st.info("No goals configured yet.")
+        for g in goals:
+            st.markdown(
+                f"""
+                <div class="review-block">
+                    <div class="goal-title-row">
+                        <span class="review-value">{g.name}</span>
+                        <span class="pill {priority_pill_class(g.priority)}">{g.priority.upper()}</span>
+                    </div>
+                    <div class="review-row"><span class="review-label">Target</span><span class="review-value">₹{g.target_amount:,.0f}</span></div>
+                    <div class="review-row"><span class="review-label">Current</span><span class="review-value">₹{g.current_amount:,.0f}</span></div>
+                    <div class="review-row"><span class="review-label">Horizon</span><span class="review-value">{g.years} years</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-if goal_errors:
-    for err in goal_errors:
-        st.warning(err)
+    if goal_errors:
+        for err in goal_errors:
+            st.warning(err)
 
-st.markdown('<div class="section-title">Generate Plan</div>', unsafe_allow_html=True)
-generate = st.button("Generate Financial Plan", type="primary", disabled=bool(goal_errors))
+    st.write("")
+    b1, b2 = st.columns([1, 1])
+    with b1:
+        if st.button("← Back", key="back_5"):
+            go_to(4)
+    with b2:
+        if st.button("Generate Financial Plan", type="primary", key="generate_plan", disabled=bool(goal_errors)):
+            try:
+                st.session_state.plan = generate_financial_plan(
+                    age=st.session_state.age,
+                    monthly_income=st.session_state.monthly_income,
+                    monthly_expenses=st.session_state.monthly_expenses,
+                    monthly_emi=st.session_state.monthly_emi,
+                    current_savings=st.session_state.current_savings,
+                    existing_investments=st.session_state.existing_investments,
+                    risk_tolerance=st.session_state.risk_tolerance,
+                    investment_experience=st.session_state.investment_experience,
+                    goals=goals,
+                )
+                go_to(6)
+            except Exception as exc:
+                st.error(f"Unable to generate the plan: {exc}")
 
 # ----------------------------------------------------------------------------
-# PLAN OUTPUT
+# STEP 6 — RESULTS
 # ----------------------------------------------------------------------------
-if generate:
-    try:
-        plan = generate_financial_plan(
-            age=age,
-            monthly_income=monthly_income,
-            monthly_expenses=monthly_expenses,
-            monthly_emi=monthly_emi,
-            current_savings=current_savings,
-            existing_investments=existing_investments,
-            risk_tolerance=risk_tolerance,
-            investment_experience=investment_experience,
-            goals=goals,
-        )
-
+elif st.session_state.current_step == 6:
+    if not st.session_state.plan:
+        st.warning("No plan has been generated yet.")
+        if st.button("← Back to Wizard", key="back_no_plan"):
+            go_to(1)
+    else:
+        plan = st.session_state.plan
         health = plan["financial_health"]
         risk = plan["risk_profile"]
         risk_validation = plan["risk_validation"]
@@ -442,6 +659,14 @@ if generate:
         priority_plan = plan["priority_based_plan"]
 
         st.success("Financial plan generated successfully.")
+
+        top1, top2 = st.columns([1, 1])
+        with top1:
+            if st.button("← Edit Inputs", key="edit_inputs"):
+                go_to(1)
+        with top2:
+            if st.button("Start New Plan", key="start_new"):
+                reset_wizard()
 
         # ---------------- KPI DASHBOARD ----------------
         st.markdown('<div class="section-title">Overview</div>', unsafe_allow_html=True)
@@ -650,6 +875,3 @@ if generate:
             'certified financial advisor before making investment decisions.</div>',
             unsafe_allow_html=True,
         )
-
-    except Exception as exc:
-        st.error(f"Unable to generate the plan: {exc}")
