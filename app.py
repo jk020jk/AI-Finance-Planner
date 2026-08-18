@@ -316,64 +316,105 @@ with st.expander("Risk Profile", expanded=True):
 # ----------------------------------------------------------------------------
 # GOALS
 # ----------------------------------------------------------------------------
-st.markdown('<div class="section-title">Financial Goals</div>', unsafe_allow_html=True)
+GOAL_LIBRARY = {
+    "Retirement":      {"icon": "🏦", "target": 5_000_000, "current": 500_000,   "years": 10, "priority": "High"},
+    "Home":            {"icon": "🏠", "target": 5_000_000, "current": 1_000_000, "years": 7,  "priority": "High"},
+    "Car":             {"icon": "🚗", "target": 1_200_000, "current": 200_000,   "years": 3,  "priority": "Medium"},
+    "Education":       {"icon": "🎓", "target": 2_000_000, "current": 0,         "years": 5,  "priority": "Medium"},
+    "Travel":          {"icon": "✈️", "target": 300_000,   "current": 50_000,    "years": 1,  "priority": "Medium"},
+    "Marriage":        {"icon": "💍", "target": 1_500_000, "current": 200_000,   "years": 4,  "priority": "Medium"},
+    "Emergency Fund":  {"icon": "🛟", "target": 300_000,   "current": 100_000,   "years": 1,  "priority": "High"},
+    "Wealth Creation": {"icon": "📈", "target": 3_000_000, "current": 200_000,   "years": 8,  "priority": "Medium"},
+    "Other":           {"icon": "🎯", "target": 500_000,   "current": 0,         "years": 3,  "priority": "Medium"},
+}
+PRIORITY_OPTIONS = ["High", "Medium", "Low"]
 
-goal_count = st.number_input(
-    "Number of Goals", min_value=1, max_value=5, value=3, step=1
+st.markdown('<div class="section-title">Financial Goals</div>', unsafe_allow_html=True)
+st.caption("Select one or more goals you want to plan for.")
+
+selected_goal_types = st.multiselect(
+    "What are you planning for?",
+    options=list(GOAL_LIBRARY.keys()),
+    default=["Retirement", "Car", "Home"],
+    key="selected_goal_types",
 )
 
-default_goals = [
-    ("Retirement", 5_000_000, 500_000, 10, "High"),
-    ("Car", 1_200_000, 200_000, 3, "Medium"),
-    ("House", 5_000_000, 1_000_000, 7, "High"),
-    ("Education", 2_000_000, 0, 5, "Medium"),
-    ("Travel", 1_000_000, 0, 3, "Low"),
-]
-
 goals = []
+goal_errors = []
 
-for i in range(int(goal_count)):
-    name, target, current, years, priority = default_goals[i]
+if not selected_goal_types:
+    goal_errors.append("Select at least one goal to continue.")
 
-    with st.expander(f"Goal {i + 1}: {name}", expanded=True):
+for goal_type in selected_goal_types:
+    defaults = GOAL_LIBRARY[goal_type]
+
+    # Resolve the display name — "Other" needs a custom name from the user.
+    if goal_type == "Other":
+        other_name = st.text_input(
+            "Enter your goal name",
+            value="",
+            key="goal_other_name",
+            placeholder="e.g. Startup, Sabbatical, Gadget Fund",
+        )
+        display_name = other_name.strip()
+        header_label = display_name if display_name else "Other (name required)"
+    else:
+        display_name = goal_type
+        header_label = goal_type
+
+    with st.expander(f"{defaults['icon']} {header_label}", expanded=True):
         g1, g2, g3 = st.columns(3)
 
         with g1:
-            goal_name = st.text_input("Goal Name", value=name, key=f"goal_name_{i}")
             target_amount = st.number_input(
-                "Target Amount (₹)", min_value=0, value=target, step=100_000,
-                key=f"goal_target_{i}"
+                "Target Amount (₹)", min_value=0, value=defaults["target"], step=50_000,
+                key=f"goal_target_{goal_type}"
             )
 
         with g2:
             current_amount = st.number_input(
-                "Current Amount (₹)", min_value=0, value=current, step=50_000,
-                key=f"goal_current_{i}"
+                "Current Amount (₹)", min_value=0, value=defaults["current"], step=25_000,
+                key=f"goal_current_{goal_type}"
             )
             horizon = st.number_input(
-                "Time Horizon (Years)", min_value=1, max_value=50, value=years, step=1,
-                key=f"goal_years_{i}"
+                "Time Horizon (Years)", min_value=1, max_value=50, value=defaults["years"], step=1,
+                key=f"goal_years_{goal_type}"
             )
 
         with g3:
             goal_priority = st.selectbox(
-                "Priority", ["High", "Medium", "Low"],
-                index=["High", "Medium", "Low"].index(priority),
-                key=f"goal_priority_{i}"
+                "Priority", PRIORITY_OPTIONS,
+                index=PRIORITY_OPTIONS.index(defaults["priority"]),
+                key=f"goal_priority_{goal_type}"
             )
 
-        goals.append(
-            FinancialGoal(
-                name=goal_name,
-                target_amount=target_amount,
-                current_amount=current_amount,
-                years=horizon,
-                priority=goal_priority,
+        # ---- validation ----
+        if goal_type == "Other" and not display_name:
+            goal_errors.append("Enter a goal name for 'Other'.")
+        if target_amount <= 0:
+            goal_errors.append(f"{header_label}: Target amount must be greater than 0.")
+        if current_amount < 0:
+            goal_errors.append(f"{header_label}: Current amount cannot be negative.")
+        if horizon <= 0:
+            goal_errors.append(f"{header_label}: Time horizon must be greater than 0.")
+
+        if display_name:
+            goals.append(
+                FinancialGoal(
+                    name=display_name,
+                    target_amount=target_amount,
+                    current_amount=current_amount,
+                    years=horizon,
+                    priority=goal_priority,
+                )
             )
-        )
+
+if goal_errors:
+    for err in goal_errors:
+        st.warning(err)
 
 st.markdown('<div class="section-title">Generate Plan</div>', unsafe_allow_html=True)
-generate = st.button("Generate Financial Plan", type="primary")
+generate = st.button("Generate Financial Plan", type="primary", disabled=bool(goal_errors))
 
 # ----------------------------------------------------------------------------
 # PLAN OUTPUT
