@@ -12,12 +12,10 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 AI Financial Planner")
-st.caption("Private local prototype • Deterministic financial planning engine")
+st.title("AI Financial Planner")
+st.caption("Deterministic financial planning engine")
 
-st.info(
-    "Privacy mode: this prototype runs the financial calculations locally. "
-    "No OpenAI API key is required."
+
 )
 
 st.header("1. Financial Profile")
