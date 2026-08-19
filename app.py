@@ -124,7 +124,7 @@ PRIORITY_OPTIONS = ["High", "Medium", "Low"]
 selected_goal_types = st.multiselect(
     "What are you planning for?",
     options=list(GOAL_LIBRARY.keys()),
-    default=["Retirement", "Car", "Home"],
+    default=[],
     key="selected_goal_types",
 )
 
