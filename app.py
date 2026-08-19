@@ -1,15 +1,21 @@
+import html
 import streamlit as st
 
 from reportlab.lib.pagesizes import A4
-
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-
-from reportlab.lib.enums import TA_LEFT
-
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-
 from reportlab.lib.units import mm
 
+from financial_engine import (
+    FinancialGoal,
+    generate_financial_plan,
+    generate_local_advisor_report,
+)
+
+
+# -------------------------------------------------------------------------
+# PDF GENERATOR
+# -------------------------------------------------------------------------
 def markdown_to_pdf(markdown_text):
     pdf_path = "financial_plan_report.pdf"
 
@@ -52,45 +58,57 @@ def markdown_to_pdf(markdown_text):
     story = []
 
     for line in markdown_text.splitlines():
-
         line = line.strip()
 
         if not line:
             story.append(Spacer(1, 5))
             continue
 
+        # Markdown headings
         if line.startswith("# "):
             text = line[2:].strip()
+            text = html.escape(text)
             story.append(Paragraph(text, title_style))
 
         elif line.startswith("## "):
             text = line[3:].strip()
+            text = html.escape(text)
             story.append(Paragraph(text, heading_style))
 
         elif line.startswith("### "):
             text = line[4:].strip()
+            text = html.escape(text)
             story.append(Paragraph(text, heading_style))
 
+        # Markdown bullet
         elif line.startswith("- "):
-            text = "• " + line[2:].strip()
-            story.append(Paragraph(text, body_style))
+            text = line[2:].strip()
+            text = html.escape(text)
+            story.append(Paragraph("• " + text, body_style))
 
+        # Normal text
         else:
-            story.append(Paragraph(line, body_style))
+            text = html.escape(line)
+
+            # Basic markdown bold support
+            text = text.replace("**", "<b>", 1)
+            if "<b>" in text:
+                text = text.replace("**", "</b>", 1)
+
+            story.append(Paragraph(text, body_style))
 
     doc.build(story)
 
     with open(pdf_path, "rb") as pdf_file:
         return pdf_file.read()
-from financial_engine import (
-    FinancialGoal,
-    generate_financial_plan,
-    generate_local_advisor_report,
-)
 
+
+# -------------------------------------------------------------------------
+# PAGE CONFIG
+# -------------------------------------------------------------------------
 st.set_page_config(
     page_title="AI Financial Planner",
-        layout="wide"
+    layout="wide"
 )
 
 st.title("AI Financial Planner")
@@ -100,39 +118,69 @@ c1, c2 = st.columns(2)
 
 with c1:
     age = st.number_input("Age", 18, 100, 28)
+
     monthly_income = st.number_input(
-        "Monthly Income (₹)", 0, 10_000_000, 100_000, step=5_000
+        "Monthly Income (₹)",
+        0,
+        10_000_000,
+        100_000,
+        step=5_000
     )
+
     monthly_expenses = st.number_input(
-        "Monthly Expenses (₹)", 0, 10_000_000, 55_000, step=5_000
+        "Monthly Expenses (₹)",
+        0,
+        10_000_000,
+        55_000,
+        step=5_000
     )
+
     monthly_emi = st.number_input(
-        "Monthly EMI (₹)", 0, 10_000_000, 10_000, step=1_000
+        "Monthly EMI (₹)",
+        0,
+        10_000_000,
+        10_000,
+        step=1_000
     )
 
 with c2:
     current_savings = st.number_input(
-        "Current Savings (₹)", 0, 100_000_000, 300_000, step=10_000
+        "Current Savings (₹)",
+        0,
+        100_000_000,
+        300_000,
+        step=10_000
     )
+
     existing_investments = st.number_input(
-        "Existing Investments (₹)", 0, 100_000_000, 500_000, step=10_000
+        "Existing Investments (₹)",
+        0,
+        100_000_000,
+        500_000,
+        step=10_000
     )
+
     risk_tolerance = st.selectbox(
-        "Risk Tolerance", ["low", "moderate", "high"], index=1
+        "Risk Tolerance",
+        ["low", "moderate", "high"],
+        index=1
     )
+
     investment_experience = st.selectbox(
         "Investment Experience",
         ["beginner", "some experience", "experienced"],
         index=0
     )
 
+
+# -------------------------------------------------------------------------
+# FINANCIAL GOALS
+# -------------------------------------------------------------------------
 st.header("2. Financial Goals")
 
 st.caption("Select one or more goals you want to plan for.")
 
-# -------------------------------------------------------------------------
-# GOAL OPTIONS
-# -------------------------------------------------------------------------
+
 GOAL_LIBRARY = {
     "Retirement": {
         "target": 5_000_000,
@@ -192,6 +240,7 @@ GOAL_LIBRARY = {
 
 PRIORITY_OPTIONS = ["High", "Medium", "Low"]
 
+
 # -------------------------------------------------------------------------
 # MULTI-SELECT GOALS
 # -------------------------------------------------------------------------
@@ -204,6 +253,7 @@ selected_goal_types = st.multiselect(
 
 goals = []
 
+
 # -------------------------------------------------------------------------
 # GOAL DETAILS
 # -------------------------------------------------------------------------
@@ -211,7 +261,6 @@ for goal_type in selected_goal_types:
 
     defaults = GOAL_LIBRARY[goal_type]
 
-    # Custom name for "Other"
     if goal_type == "Other":
         goal_name = st.text_input(
             "Goal Name",
@@ -276,8 +325,14 @@ for goal_type in selected_goal_types:
                 )
             )
 
+
+# -------------------------------------------------------------------------
+# GENERATE FINANCIAL PLAN
+# -------------------------------------------------------------------------
 if st.button("Generate Financial Plan", type="primary"):
+
     try:
+
         plan = generate_financial_plan(
             age=age,
             monthly_income=monthly_income,
@@ -298,18 +353,56 @@ if st.button("Generate Financial Plan", type="primary"):
         capacity = plan["investment_capacity"]
         analysis = plan["goal_analysis"]
 
-        st.header("Financial Health")
-        a, b, c, d = st.columns(4)
-        a.metric("Monthly Surplus", f"₹{health['monthly_surplus']:,.0f}")
-        b.metric("Savings Rate", f"{health['savings_rate']:.1f}%")
-        c.metric("Debt-to-Income", f"{health['debt_to_income']:.1f}%")
-        d.metric("Health Score", f"{health['financial_health_score']:.2f}/100")
 
+        # -----------------------------------------------------------------
+        # FINANCIAL HEALTH
+        # -----------------------------------------------------------------
+        st.header("Financial Health")
+
+        a, b, c, d = st.columns(4)
+
+        a.metric(
+            "Monthly Surplus",
+            f"₹{health['monthly_surplus']:,.0f}"
+        )
+
+        b.metric(
+            "Savings Rate",
+            f"{health['savings_rate']:.1f}%"
+        )
+
+        c.metric(
+            "Debt-to-Income",
+            f"{health['debt_to_income']:.1f}%"
+        )
+
+        d.metric(
+            "Health Score",
+            f"{health['financial_health_score']:.2f}/100"
+        )
+
+
+        # -----------------------------------------------------------------
+        # RISK PROFILE
+        # -----------------------------------------------------------------
         st.header("Risk Profile")
+
         a, b, c = st.columns(3)
-        a.metric("Profile", risk["risk_profile"])
-        b.metric("Risk Score", risk["risk_score"])
-        c.metric("Horizon", f"{risk['investment_horizon_years']} years")
+
+        a.metric(
+            "Profile",
+            risk["risk_profile"]
+        )
+
+        b.metric(
+            "Risk Score",
+            risk["risk_score"]
+        )
+
+        c.metric(
+            "Horizon",
+            f"{risk['investment_horizon_years']} years"
+        )
 
         if plan["risk_validation"]["status"] != "Aligned":
             st.warning(
@@ -319,27 +412,68 @@ if st.button("Generate Financial Plan", type="primary"):
                 f"{plan['risk_validation']['calculated_risk_profile']}."
             )
 
-        st.header("Emergency Fund")
-        a, b, c = st.columns(3)
-        a.metric("Current Coverage", f"{emergency['current_months']:.2f} months")
-        b.metric("Target", f"{emergency['target_months']} months")
-        c.metric("Gap", f"₹{emergency['gap']:,.0f}")
 
+        # -----------------------------------------------------------------
+        # EMERGENCY FUND
+        # -----------------------------------------------------------------
+        st.header("Emergency Fund")
+
+        a, b, c = st.columns(3)
+
+        a.metric(
+            "Current Coverage",
+            f"{emergency['current_months']:.2f} months"
+        )
+
+        b.metric(
+            "Target",
+            f"{emergency['target_months']} months"
+        )
+
+        c.metric(
+            "Gap",
+            f"₹{emergency['gap']:,.0f}"
+        )
+
+
+        # -----------------------------------------------------------------
+        # INVESTMENT CAPACITY
+        # -----------------------------------------------------------------
         st.header("Investment Capacity")
+
         st.metric(
             "Monthly Investment Capacity",
             f"₹{capacity['monthly_investment_capacity']:,.0f}"
         )
 
+
+        # -----------------------------------------------------------------
+        # GOAL-WISE PLAN
+        # -----------------------------------------------------------------
         st.header("Goal-wise Plan")
+
         for goal in analysis["goals"]:
+
             with st.expander(
                 f"{goal['goal']} • {goal['priority']} • {goal['status']}"
             ):
+
                 a, b, c = st.columns(3)
-                a.metric("Target", f"₹{goal['target_amount']:,.0f}")
-                b.metric("Required SIP", f"₹{goal['required_monthly_sip']:,.2f}")
-                c.metric("Horizon", f"{goal['years']} years")
+
+                a.metric(
+                    "Target",
+                    f"₹{goal['target_amount']:,.0f}"
+                )
+
+                b.metric(
+                    "Required SIP",
+                    f"₹{goal['required_monthly_sip']:,.2f}"
+                )
+
+                c.metric(
+                    "Horizon",
+                    f"{goal['years']} years"
+                )
 
                 st.write(
                     f"Allocation — Equity {goal['allocation']['equity']}% | "
@@ -349,15 +483,23 @@ if st.button("Generate Financial Plan", type="primary"):
                 )
 
                 st.write("Scenario SIPs:")
+
                 for scenario in goal["scenarios"]:
+
                     st.write(
                         f"- {scenario['scenario']}: "
                         f"{scenario['annual_return']:.0f}% assumption → "
                         f"₹{scenario['required_monthly_sip']:,.2f}/month"
                     )
 
+
+        # -----------------------------------------------------------------
+        # PRIORITY-BASED FUNDING
+        # -----------------------------------------------------------------
         st.header("Priority-Based Funding")
+
         for item in plan["priority_based_plan"]["allocations"]:
+
             st.write(
                 f"**{item['goal']} — {item['funding_status']}**  \n"
                 f"Required: ₹{item['required_sip']:,.2f} | "
@@ -365,29 +507,64 @@ if st.button("Generate Financial Plan", type="primary"):
                 f"Unfunded: ₹{item['unfunded_amount']:,.2f}"
             )
 
+
+        # -----------------------------------------------------------------
+        # OVERALL PLAN
+        # -----------------------------------------------------------------
         st.header("Overall Plan")
+
         a, b, c = st.columns(3)
-        a.metric("Total Required SIP", f"₹{analysis['total_required_sip']:,.2f}")
-        b.metric("Available Capacity", f"₹{analysis['investment_capacity']:,.2f}")
-        c.metric("Gap", f"₹{analysis['overall_gap']:,.2f}")
+
+        a.metric(
+            "Total Required SIP",
+            f"₹{analysis['total_required_sip']:,.2f}"
+        )
+
+        b.metric(
+            "Available Capacity",
+            f"₹{analysis['investment_capacity']:,.2f}"
+        )
+
+        c.metric(
+            "Gap",
+            f"₹{analysis['overall_gap']:,.2f}"
+        )
 
         if analysis["overall_status"] == "Funding Gap":
-            st.error(f"Overall status: {analysis['overall_status']}")
+            st.error(
+                f"Overall status: {analysis['overall_status']}"
+            )
         else:
-            st.success(f"Overall status: {analysis['overall_status']}")
+            st.success(
+                f"Overall status: {analysis['overall_status']}"
+            )
 
+
+        # -----------------------------------------------------------------
+        # LOCAL ADVISOR REPORT
+        # -----------------------------------------------------------------
         st.header("Local Advisor Report")
+
         report = generate_local_advisor_report(plan)
+
         st.markdown(report)
 
-       pdf_data = markdown_to_pdf(report)
 
-st.download_button(
-    "Download Financial Plan (PDF)",
-    data=pdf_data,
-    file_name="financial_plan_report.pdf",
-    mime="application/pdf",
-)
+        # -----------------------------------------------------------------
+        # PDF DOWNLOAD
+        # -----------------------------------------------------------------
+        pdf_data = markdown_to_pdf(report)
+
+        st.download_button(
+            "Download Financial Plan (PDF)",
+            data=pdf_data,
+            file_name="financial_plan_report.pdf",
+            mime="application/pdf",
+        )
+
 
     except Exception as exc:
-        st.error(f"Unable to generate the plan: {exc}")
+
+        st.error(
+            f"Unable to generate the plan: {exc}"
+        )
