@@ -1,4 +1,3 @@
-
 import streamlit as st
 from financial_engine import (
     FinancialGoal,
@@ -8,16 +7,10 @@ from financial_engine import (
 
 st.set_page_config(
     page_title="AI Financial Planner",
-    page_icon="📊",
-    layout="wide"
+        layout="wide"
 )
 
 st.title("AI Financial Planner")
-st.caption("Deterministic financial planning engine")
-
-
-)
-
 st.header("1. Financial Profile")
 
 c1, c2 = st.columns(2)
