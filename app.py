@@ -380,12 +380,14 @@ if st.button("Generate Financial Plan", type="primary"):
         report = generate_local_advisor_report(plan)
         st.markdown(report)
 
-        st.download_button(
-            "Download Local Report",
-            data=report,
-            file_name="financial_plan_report.md",
-            mime="text/markdown",
-        )
+       pdf_data = markdown_to_pdf(report)
+
+st.download_button(
+    "Download Financial Plan (PDF)",
+    data=pdf_data,
+    file_name="financial_plan_report.pdf",
+    mime="application/pdf",
+)
 
     except Exception as exc:
         st.error(f"Unable to generate the plan: {exc}")
