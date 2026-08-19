@@ -1,4 +1,87 @@
 import streamlit as st
+
+from reportlab.lib.pagesizes import A4
+
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+from reportlab.lib.enums import TA_LEFT
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
+from reportlab.lib.units import mm
+
+def markdown_to_pdf(markdown_text):
+    pdf_path = "financial_plan_report.pdf"
+
+    doc = SimpleDocTemplate(
+        pdf_path,
+        pagesize=A4,
+        rightMargin=18 * mm,
+        leftMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "TitleCustom",
+        parent=styles["Title"],
+        fontSize=18,
+        leading=22,
+        spaceAfter=12,
+    )
+
+    heading_style = ParagraphStyle(
+        "HeadingCustom",
+        parent=styles["Heading2"],
+        fontSize=13,
+        leading=16,
+        spaceBefore=10,
+        spaceAfter=6,
+    )
+
+    body_style = ParagraphStyle(
+        "BodyCustom",
+        parent=styles["BodyText"],
+        fontSize=9.5,
+        leading=14,
+        spaceAfter=5,
+    )
+
+    story = []
+
+    for line in markdown_text.splitlines():
+
+        line = line.strip()
+
+        if not line:
+            story.append(Spacer(1, 5))
+            continue
+
+        if line.startswith("# "):
+            text = line[2:].strip()
+            story.append(Paragraph(text, title_style))
+
+        elif line.startswith("## "):
+            text = line[3:].strip()
+            story.append(Paragraph(text, heading_style))
+
+        elif line.startswith("### "):
+            text = line[4:].strip()
+            story.append(Paragraph(text, heading_style))
+
+        elif line.startswith("- "):
+            text = "• " + line[2:].strip()
+            story.append(Paragraph(text, body_style))
+
+        else:
+            story.append(Paragraph(line, body_style))
+
+    doc.build(story)
+
+    with open(pdf_path, "rb") as pdf_file:
+        return pdf_file.read()
 from financial_engine import (
     FinancialGoal,
     generate_financial_plan,
