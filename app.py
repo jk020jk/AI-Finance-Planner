@@ -54,74 +54,153 @@ with c2:
 
 st.header("2. Financial Goals")
 
-goal_count = st.number_input(
-    "Number of Goals", min_value=1, max_value=5, value=3, step=1
-)
+st.caption("Select one or more goals you want to plan for.")
 
-default_goals = [
-    ("Retirement", 5_000_000, 500_000, 10, "High"),
-    ("Car", 1_200_000, 200_000, 3, "Medium"),
-    ("House", 5_000_000, 1_000_000, 7, "High"),
-    ("Education", 2_000_000, 0, 5, "Medium"),
-    ("Travel", 1_000_000, 0, 3, "Low"),
-]
+# -------------------------------------------------------------------------
+# GOAL OPTIONS
+# -------------------------------------------------------------------------
+GOAL_LIBRARY = {
+    "Retirement": {
+        "target": 5_000_000,
+        "current": 500_000,
+        "years": 10,
+        "priority": "High",
+    },
+    "Home": {
+        "target": 5_000_000,
+        "current": 1_000_000,
+        "years": 7,
+        "priority": "High",
+    },
+    "Car": {
+        "target": 1_200_000,
+        "current": 200_000,
+        "years": 3,
+        "priority": "Medium",
+    },
+    "Education": {
+        "target": 2_000_000,
+        "current": 0,
+        "years": 5,
+        "priority": "Medium",
+    },
+    "Travel": {
+        "target": 1_000_000,
+        "current": 0,
+        "years": 3,
+        "priority": "Low",
+    },
+    "Marriage": {
+        "target": 1_500_000,
+        "current": 200_000,
+        "years": 4,
+        "priority": "Medium",
+    },
+    "Emergency Fund": {
+        "target": 300_000,
+        "current": 100_000,
+        "years": 1,
+        "priority": "High",
+    },
+    "Wealth Creation": {
+        "target": 3_000_000,
+        "current": 200_000,
+        "years": 8,
+        "priority": "Medium",
+    },
+    "Other": {
+        "target": 500_000,
+        "current": 0,
+        "years": 3,
+        "priority": "Medium",
+    },
+}
+
+PRIORITY_OPTIONS = ["High", "Medium", "Low"]
+
+# -------------------------------------------------------------------------
+# MULTI-SELECT GOALS
+# -------------------------------------------------------------------------
+selected_goal_types = st.multiselect(
+    "What are you planning for?",
+    options=list(GOAL_LIBRARY.keys()),
+    default=["Retirement", "Car", "Home"],
+    key="selected_goal_types",
+)
 
 goals = []
 
-for i in range(int(goal_count)):
-    name, target, current, years, priority = default_goals[i]
+# -------------------------------------------------------------------------
+# GOAL DETAILS
+# -------------------------------------------------------------------------
+for goal_type in selected_goal_types:
 
-    with st.expander(f"Goal {i + 1}: {name}", expanded=True):
+    defaults = GOAL_LIBRARY[goal_type]
+
+    # Custom name for "Other"
+    if goal_type == "Other":
+        goal_name = st.text_input(
+            "Goal Name",
+            value="",
+            placeholder="e.g. Startup, Sabbatical, Gadget Fund",
+            key="goal_name_other",
+        )
+    else:
+        goal_name = goal_type
+
+    with st.expander(f"{goal_type}", expanded=True):
+
         g1, g2, g3 = st.columns(3)
 
         with g1:
-            goal_name = st.text_input(
-                "Goal Name", value=name, key=f"goal_name_{i}"
-            )
             target_amount = st.number_input(
                 "Target Amount (₹)",
                 min_value=0,
-                value=target,
+                value=defaults["target"],
                 step=100_000,
-                key=f"goal_target_{i}"
+                key=f"goal_target_{goal_type}",
             )
 
         with g2:
             current_amount = st.number_input(
                 "Current Amount (₹)",
                 min_value=0,
-                value=current,
+                value=defaults["current"],
                 step=50_000,
-                key=f"goal_current_{i}"
+                key=f"goal_current_{goal_type}",
             )
+
+        with g3:
             horizon = st.number_input(
                 "Time Horizon (Years)",
                 min_value=1,
                 max_value=50,
-                value=years,
+                value=defaults["years"],
                 step=1,
-                key=f"goal_years_{i}"
+                key=f"goal_years_{goal_type}",
             )
 
-        with g3:
-            goal_priority = st.selectbox(
-                "Priority",
-                ["High", "Medium", "Low"],
-                index=["High", "Medium", "Low"].index(priority),
-                key=f"goal_priority_{i}"
-            )
-
-        goals.append(
-            FinancialGoal(
-                name=goal_name,
-                target_amount=target_amount,
-                current_amount=current_amount,
-                years=horizon,
-                priority=goal_priority,
-            )
+        goal_priority = st.selectbox(
+            "Priority",
+            PRIORITY_OPTIONS,
+            index=PRIORITY_OPTIONS.index(defaults["priority"]),
+            key=f"goal_priority_{goal_type}",
         )
 
-st.header("3. Generate Plan")
+        # Validation
+        if goal_type == "Other" and not goal_name.strip():
+            st.warning("Please enter a name for your custom goal.")
+
+        if goal_name.strip() and target_amount > 0:
+            goals.append(
+                FinancialGoal(
+                    name=goal_name.strip(),
+                    target_amount=target_amount,
+                    current_amount=current_amount,
+                    years=horizon,
+                    priority=goal_priority,
+                )
+            )
 
 if st.button("Generate Financial Plan", type="primary"):
     try:
